@@ -4,11 +4,11 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
-import numpy as np
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
 
 torch.manual_seed(24)
 
-# ========== 改进1: 添加数据增强 ==========
 train_transform = transforms.Compose(
     [
         transforms.RandomRotation(10),  # 新增
@@ -22,7 +22,6 @@ test_transform = transforms.Compose(
     [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
 )
 
-# 数据加载
 train_dataset = datasets.MNIST(
     "./dataset", train=True, download=True, transform=train_transform
 )
@@ -36,7 +35,6 @@ device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 print(f"使用设备: {device}\n")
 
 
-# ========== 改进2: 添加第三卷积块 ==========
 class ImprovedCNN(nn.Module):
     def __init__(self):
         super(ImprovedCNN, self).__init__()
@@ -61,7 +59,6 @@ class ImprovedCNN(nn.Module):
             nn.MaxPool2d(2),
         )
 
-        # 新增第三卷积块
         self.conv3 = nn.Sequential(
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
@@ -71,7 +68,7 @@ class ImprovedCNN(nn.Module):
 
         self.fc = nn.Sequential(
             nn.Dropout(0.5),
-            nn.Linear(128 * 3 * 3, 256),  # 修改维度
+            nn.Linear(128 * 3 * 3, 256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, 10),
@@ -80,7 +77,7 @@ class ImprovedCNN(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
-        x = self.conv3(x)  # 新增
+        x = self.conv3(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
         return x
@@ -94,11 +91,10 @@ print(f"\n参数量: {sum(p.numel() for p in model.parameters()):,}\n")
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# ========== 改进3: 使用OneCycleLR ==========
 scheduler = optim.lr_scheduler.OneCycleLR(
     optimizer,
-    max_lr=0.01,  # 峰值学习率
-    epochs=20,  # 改进4: 增加训练轮次
+    max_lr=0.01,
+    epochs=20,
     steps_per_epoch=len(train_loader),
 )
 
@@ -117,11 +113,10 @@ def train(epoch, train_losses, train_accs):
         loss = criterion(output, target)
         loss.backward()
 
-        # 改进5: 梯度裁剪
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
         optimizer.step()
-        scheduler.step()  # 每个batch更新学习率
+        scheduler.step()
 
         running_loss += loss.item()
         _, predicted = torch.max(output.data, 1)
@@ -164,7 +159,7 @@ def evaluate(loader, test_losses, test_accs):
     return accuracy
 
 
-EPOCHS = 20  # 从15增加到20
+EPOCHS = 20
 best_acc = 0.0
 
 train_losses = []
@@ -184,7 +179,6 @@ for epoch in range(EPOCHS):
 
 print(f"\n训练完成! 最佳准确率: {best_acc:.2f}%\n")
 
-# 可视化
 fig, axes = plt.subplots(1, 2, figsize=(15, 5))
 
 axes[0].plot(train_losses, label="Train Loss", linewidth=2)
@@ -206,7 +200,6 @@ axes[1].grid(alpha=0.3)
 plt.tight_layout()
 plt.show()
 
-# 预测展示
 model.load_state_dict(torch.load("mnist_best_improved.pth"))
 model.eval()
 
@@ -233,13 +226,10 @@ for i, ax in enumerate(axes.flat):
     ax.set_title(f"Pred: {pred}, True: {true}", color=color, fontweight="bold")
     ax.axis("off")
 
-plt.suptitle("预测结果 (绿色=正确, 红色=错误)", fontsize=14, fontweight="bold")
+plt.suptitle("预测结果", fontsize=14, fontweight="bold")
 plt.tight_layout()
 plt.show()
 
-# 混淆矩阵
-from sklearn.metrics import confusion_matrix, classification_report
-import seaborn as sns
 
 print("\n生成混淆矩阵...")
 
