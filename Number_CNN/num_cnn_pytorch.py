@@ -11,8 +11,8 @@ torch.manual_seed(24)
 
 train_transform = transforms.Compose(
     [
-        transforms.RandomRotation(10),  # 新增
-        transforms.RandomAffine(0, translate=(0.1, 0.1)),  # 新增
+        transforms.RandomRotation(10),
+        transforms.RandomAffine(0, translate=(0.1, 0.1)),
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
     ]
