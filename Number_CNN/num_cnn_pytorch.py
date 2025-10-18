@@ -167,7 +167,7 @@ train_accs = []
 test_losses = []
 test_accs = []
 
-print("开始训练...\n")
+print("开始训练\n")
 
 for epoch in range(EPOCHS):
     train(epoch, train_losses, train_accs)
@@ -177,7 +177,7 @@ for epoch in range(EPOCHS):
         best_acc = acc
         torch.save(model.state_dict(), "mnist_best_improved.pth")
 
-print(f"\n训练完成! 最佳准确率: {best_acc:.2f}%\n")
+print(f"\n训练完成, 最佳准确率: {best_acc:.2f}%\n")
 
 fig, axes = plt.subplots(1, 2, figsize=(15, 5))
 
