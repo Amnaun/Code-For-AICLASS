@@ -1,13 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-FashionMNIST ResNet-18 (PyTorch) - 最终版
-风格重构版：按 MNIST 示例，采用平铺式脚本风格
-- [模型] 改造后的 ResNet-18 架构
-- [增强] 强数据增强 (Rotation, Erasing)
-- [策略] AdamW + CosineAnnealingLR
-- [修复] 指定 macOS 系统中文字体 (STHeiti)
-"""
-
 import os
 import random
 import numpy as np
@@ -25,41 +15,18 @@ from sklearn.metrics import confusion_matrix, classification_report
 from torchvision import datasets, transforms
 from torchvision.models import resnet18
 
-# ===================== 1. 全局设置 =====================
+matplotlib.rcParams["font.family"] = "STHeiti"
+matplotlib.rcParams["axes.unicode_minus"] = False
 
-# --- 【修复】设置中文字体 ---
-# 解决 Matplotlib 中文显示为方框的问题 (使用 macOS 自带字体)
-try:
-    # "华文黑体" (STHeiti) 在 macOS 上通常可用
-    matplotlib.rcParams["font.family"] = "STHeiti"
-    matplotlib.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
-    print("字体 'STHeiti' 设置成功。")
-except Exception as e:
-    print(f"字体 'STHeiti' 设置失败: {e}. 尝试备选 'PingFang SC'...")
-    try:
-        matplotlib.rcParams["font.family"] = "PingFang SC"
-        matplotlib.rcParams["axes.unicode_minus"] = False
-        print("字体 'PingFang SC' 设置成功。")
-    except Exception as e2:
-        print(f"备选字体 'PingFang SC' 亦失败: {e2}.")
-        print("所有备选字体均失败。plots 可能无法正确显示中文。")
-        print("请尝试 '【终极方案】' (见代码底部注释)。")
-        matplotlib.rcParams["axes.unicode_minus"] = False
-
-# --- 随机种子 ---
 torch.manual_seed(17)
 random.seed(17)
 np.random.seed(17)
 
-# --- 设备 ---
 device = torch.device(
     "mps"
     if torch.backends.mps.is_available()
     else ("cuda" if torch.cuda.is_available() else "cpu")
 )
-print(f"使用设备: {device}\n")
-
-# --- 类别 ---
 CLASS_NAMES = [
     "T-shirt/top",
     "Trouser",
@@ -73,16 +40,14 @@ CLASS_NAMES = [
     "Ankle boot",
 ]
 
-# --- 数据增强 ---
 train_transform = transforms.Compose(
     [
         transforms.RandomCrop(28, padding=2),
         transforms.RandomHorizontalFlip(p=0.2),
-        transforms.RandomRotation(15),  # 随机旋转 ±15 度
+        transforms.RandomRotation(15),
         transforms.ToTensor(),
-        # 随机擦除
         transforms.RandomErasing(p=0.5, scale=(0.02, 0.20), ratio=(0.3, 3.3), value=0),
-        transforms.Normalize((0.2861,), (0.3530,)),  # 标准化
+        transforms.Normalize((0.2861,), (0.3530,)),
     ]
 )
 
@@ -93,7 +58,6 @@ test_transform = transforms.Compose(
     ]
 )
 
-# --- 数据集 ---
 train_dataset = datasets.FashionMNIST(
     "./dataset_fashion", train=True, download=True, transform=train_transform
 )
@@ -101,16 +65,9 @@ test_dataset = datasets.FashionMNIST(
     "./dataset_fashion", train=False, download=True, transform=test_transform
 )
 
-# --- 数据加载器 ---
-if device.type == "cuda":
-    num_workers = 2
-    pin_memory = True
-    BATCH_SIZE = 128
-else:
-    # MPS/CPU：最稳的是 workers=0，pin_memory=False
-    num_workers = 0
-    pin_memory = False
-    BATCH_SIZE = 128
+num_workers = 0
+pin_memory = False
+BATCH_SIZE = 128
 
 train_loader = DataLoader(
     train_dataset,
@@ -118,7 +75,7 @@ train_loader = DataLoader(
     shuffle=True,
     num_workers=num_workers,
     pin_memory=pin_memory,
-    drop_last=True,  # 配合 Scheduler 步数对齐
+    drop_last=True,
 )
 test_loader = DataLoader(
     test_dataset,
@@ -129,22 +86,16 @@ test_loader = DataLoader(
     drop_last=False,
 )
 
-# ===================== 2. 模型定义 =====================
-
 
 class ResNet18ForFashionMNIST(nn.Module):
     def __init__(self):
         super().__init__()
-        # 加载 ResNet-18 结构, weights=None 表示随机初始化
         self.model = resnet18(weights=None)
 
-        # 1. 改造输入层: 1通道, 3x3 kernel, stride 1
         self.model.conv1 = nn.Conv2d(
             1, 64, kernel_size=3, stride=1, padding=1, bias=False
         )
-        # 2. 移除 MaxPool (对 28x28 太猛了)
         self.model.maxpool = nn.Identity()
-        # 3. 改造输出层: 512 -> 10
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, 10)
 
@@ -152,24 +103,14 @@ class ResNet18ForFashionMNIST(nn.Module):
         return self.model(x)
 
 
-# ===================== 3. 全局实例和超参 =====================
-
 model = ResNet18ForFashionMNIST().to(device)
-
-print("模型结构: (ResNet18-FashionMNIST)")
-print(f"\n参数量: {sum(p.numel() for p in model.parameters()):,} (ResNet-18)\n")
-
-# --- 损失函数 (带标签平滑), 优化器, 周期 ---
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
-EPOCHS = 3
+EPOCHS = 15
 
-# --- 调度器: 余弦退火 ---
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
     optimizer, T_max=EPOCHS * len(train_loader), eta_min=1e-6
 )
-
-# ===================== 4. 训练/评估函数 (依赖全局变量) =====================
 
 
 def train(epoch, train_losses, train_accs):
@@ -231,15 +172,13 @@ def evaluate(loader, test_losses, test_accs):
     return accuracy
 
 
-# ===================== 5. 训练主循环 =====================
-
 best_acc = 0.0
 train_losses = []
 train_accs = []
 test_losses = []
 test_accs = []
 
-print("开始训练 (使用 ResNet-18)...\n")
+print("开始训练\n")
 
 for epoch in range(EPOCHS):
     train(epoch, train_losses, train_accs)
@@ -251,9 +190,6 @@ for epoch in range(EPOCHS):
 
 print(f"\n训练完成, 最佳准确率: {best_acc:.2f}%\n")
 
-# ===================== 6. 结果可视化 (全局执行) =====================
-
-# --- 6.1 绘制学习曲线 ---
 fig, ax = plt.subplots(1, 2, figsize=(15, 5))
 ax[0].plot(train_losses, label="Train Loss", linewidth=2)
 ax[0].plot(test_losses, label="Test Loss", linewidth=2)
@@ -274,12 +210,10 @@ ax[1].grid(alpha=0.3)
 plt.tight_layout()
 plt.show()
 
-# --- 6.2 载入最佳权重 ---
-print("载入最佳权重 (ResNet-18) 进行评估...")
+print("评估")
 model.load_state_dict(torch.load("fashionmnist_best_resnet18.pth", map_location=device))
 model.eval()
 
-# --- 6.3 随机抽样 15 张可视化 ---
 num_samples = 15
 indices = random.sample(range(len(test_dataset)), num_samples)
 
@@ -326,8 +260,7 @@ plt.tight_layout()
 plt.show()
 
 
-# --- 6.4 混淆矩阵 & 分类报告 ---
-print("\n生成混淆矩阵...")
+print("\n生成混淆矩阵:")
 all_preds, all_labels = [], []
 model.eval()
 
@@ -356,8 +289,7 @@ plt.show()
 print("\n分类报告:")
 print(classification_report(all_labels, all_preds, target_names=CLASS_NAMES, digits=4))
 
-# --- 6.5 你要的“抽样对比” (来自第一个 Paddle 脚本) ---
-print("\n" + "=" * 20 + " 抽样展示 (类 Paddle) " + "=" * 20)
+print("\n" + "=" * 20 + " 抽样展示" + "=" * 20)
 
 model.eval()
 indexs = [37, 24, 51, 181, 262, 388]
