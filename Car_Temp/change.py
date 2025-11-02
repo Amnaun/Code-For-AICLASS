@@ -76,10 +76,6 @@ def get_data_list(target_path, train_list_path, eval_list_path):
             class_detail.append(class_detail_list)
             train_parameters["label_dict"][str(class_label)] = class_dir
             class_label += 1
-    if class_dim == 0:
-        print(f"错误：在 {data_list_path} 中没有找到任何分类文件夹。")
-        print("请确保该文件夹下直接包含 0, 1, A, B... 等文件夹。")
-        return False
     train_parameters["class_dim"] = class_dim
     print(f"动态检测到 {class_dim} 个类别。")
     random.shuffle(eval_list)
@@ -97,7 +93,6 @@ def get_data_list(target_path, train_list_path, eval_list_path):
     jsons = json.dumps(readjson, sort_keys=True, indent=4, separators=(",", ": "))
     with open(train_parameters["readme_path"], "w") as f:
         f.write(jsons)
-    print("生成数据列表完成！")
     return True
 
 
@@ -176,7 +171,7 @@ all_train_loss = []
 
 def draw_train_loss(Batchs, train_loss):
     plt.figure()
-    title = "training loss (PyTorch+MPS+CNN_v2)"
+    title = "training loss"
     plt.title(title, fontsize=24)
     plt.xlabel("batch", fontsize=14)
     plt.ylabel("loss", fontsize=14)
@@ -191,7 +186,6 @@ target_path = train_parameters["target_path"]
 train_list_path = train_parameters["train_list_path"]
 eval_list_path = train_parameters["eval_list_path"]
 batch_size = train_parameters["train_batch_size"]
-print(f"大A哥：已跳过解压步骤，准备从 '{target_path}' 读取数据。")
 with open(train_list_path, "w") as f:
     f.seek(0)
     f.truncate()
@@ -220,7 +214,7 @@ optimizer = optim.Adam(
 )
 epochs_num = train_parameters["num_epochs"]
 Batch = 0
-print("\n--- 开始训练 (升级版 CNN + Adam) ---")
+print("\n--- 开始训练 ---")
 for pass_num in range(epochs_num):
     model.train()
     for batch_id, (images, labels) in enumerate(train_loader):
