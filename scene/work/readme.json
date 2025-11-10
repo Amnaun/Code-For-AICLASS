@@ -1,0 +1,31 @@
+{
+  "dataset_root": "dataset/scenes",
+  "all_class_images": 3498,
+  "class_detail": [
+    {
+      "class_name": "church",
+      "class_label": 0,
+      "images": 458
+    },
+    {
+      "class_name": "desert",
+      "class_label": 1,
+      "images": 757
+    },
+    {
+      "class_name": "ice",
+      "class_label": 2,
+      "images": 762
+    },
+    {
+      "class_name": "lawn",
+      "class_label": 3,
+      "images": 752
+    },
+    {
+      "class_name": "river",
+      "class_label": 4,
+      "images": 769
+    }
+  ]
+}
